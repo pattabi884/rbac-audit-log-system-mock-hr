@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false,
+    "esModuleInterop": true,
+    "isolatedModules": false,
+
+    /*
+      PATHS — this is what was missing entirely.
+      These are aliases so instead of writing:
+      '../../infrastructure/database/schemas/user.schema'
+      you can write:
+      '@infrastructure/database/schemas/user.schema'
+      
+      The * is a wildcard that matches anything after the prefix.
+      baseUrl: "./" means paths start from the project root.
+      So @infrastructure/* maps to src/infrastructure/*
+    */
+    "paths": {
+      "@modules/*": ["src/modules/*"],
+      "@infrastructure/*": ["src/infrastructure/*"],
+      "@common/*": ["src/common/*"]
+    }
+  }
+}

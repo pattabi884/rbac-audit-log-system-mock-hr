@@ -2,8 +2,6 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
-// Configures Redis connection for BullMQ
-
 @Module({
   imports: [
     BullModule.forRootAsync({
@@ -11,13 +9,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         connection: {
-          host: config.get('REDIS_HOST'),
-          port: config.get('REDIS_PORT'),
+          url: config.get('REDIS_URL'),
+          tls: config.get('NODE_ENV') === 'production' ? {} : undefined,
         },
       }),
     }),
 
-    // Register audit queue
     BullModule.registerQueue({
       name: 'audit',
     }),

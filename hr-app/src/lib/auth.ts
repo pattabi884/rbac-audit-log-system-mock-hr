@@ -10,8 +10,16 @@ const TOKEN_KEY = "hr_token";
 const USER_KEY = "hr_user";
 
 export function setAuth(token: string, user: AuthUser) {
-  Cookies.set(TOKEN_KEY, token, { expires: 1 });
-  Cookies.set(USER_KEY, JSON.stringify(user), { expires: 1 });
+  Cookies.set(TOKEN_KEY, token, { 
+    expires: 1,
+    sameSite: 'lax',
+    secure: window.location.protocol === 'https:'
+  });
+  Cookies.set(USER_KEY, JSON.stringify(user), { 
+    expires: 1,
+    sameSite: 'lax',
+    secure: window.location.protocol === 'https:'
+  });
 }
 
 export function getToken(): string | undefined {

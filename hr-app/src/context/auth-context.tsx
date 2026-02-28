@@ -32,26 +32,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function refresh() {
   const u = getUser();
   const token = getToken();
+  console.log('refresh called - user:', u);
+  console.log('refresh called - token:', token ? 'exists' : 'missing');
   if (!u || !token) { setLoading(false); return; }
 
   setUser(u);
   try {
+    console.log('fetching permissions for:', u.userId);
     const [perms, userRoles] = await Promise.all([
       rbacApi.myPermissions(u.userId),
       rbacApi.myRoles(u.userId),
     ]);
-    //console.log('Permissions loaded:', perms);
-    //console.log('Roles loaded:', userRoles);
+    console.log('perms:', perms);
+    console.log('roles:', userRoles);
     setPermissions(perms);
     setRoles(userRoles);
   } catch (err) {
     console.error('Auth refresh error:', err);
-    clearAuth();
   } finally {
     setLoading(false);
   }
 }
-
   useEffect(() => { refresh(); }, []);
 
   function hasPermission(permission: string): boolean {

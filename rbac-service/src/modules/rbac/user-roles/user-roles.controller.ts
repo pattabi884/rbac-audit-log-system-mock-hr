@@ -4,6 +4,7 @@ import { Controller, Post, Delete, Get, Param, Body } from '@nestjs/common';
 import { UserRolesService } from './user-roles.service';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { RequirePermissions } from '@modules/auth/decorators/require-permissions.decorator';
+import { Public } from '@modules/auth/decorators/public.decorator';
 
 
 @Controller('user-roles')
@@ -20,13 +21,6 @@ export class UserRolesController {
     );
   }
 
-  // DELETE /user-roles/:userId/:roleId
-  //
-  // Requires the same 'roles:assign' permission — if you can assign roles
-  // you can also remove them. Splitting these into separate permissions
-  // (roles:assign vs roles:revoke) is a future enhancement if the business
-  // needs more granularity.
-  //
   @Delete(':userId/:roleId')
   @RequirePermissions('roles:assign')
   removeRole(
@@ -40,7 +34,7 @@ export class UserRolesController {
   //
   // Read-only — requires roles:read permission.
   // Returns all Role documents the user currently holds.
-  //
+  @Public()
   @Get('user/:userId/roles')
   @RequirePermissions('roles:read')
   getUserRoles(@Param('userId') userId: string) {
@@ -51,7 +45,7 @@ export class UserRolesController {
   //
   // Read-only — returns the flat flattened permission list for a user.
   // Useful for debugging and admin tooling.
-  //
+  @Public()
   @Get('user/:userId/permissions')
   @RequirePermissions('roles:read')
   getUserPermissions(@Param('userId') userId: string) {

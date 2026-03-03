@@ -29,7 +29,12 @@ export function getToken(): string | undefined {
 export function getUser(): AuthUser | null {
   const raw = Cookies.get(USER_KEY);
   if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
+  try {
+    const decoded = decodeURIComponent(raw);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
 }
 
 export function clearAuth() {

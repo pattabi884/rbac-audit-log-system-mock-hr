@@ -13,17 +13,49 @@ import { QueueModule } from '@infrastructure/queues/queue.module';
 import { RbacModule } from '@modules/rbac/rbac.module';
 import { AuthModule } from '@modules/auth/auth.module';
 import { UsersModule } from '@modules/users/users.module';
+import { BonusModule } from '@modules/bonus/bonus.module'; // NEW
 
-// The guard itself
+// Global guards
 import { PermissionsGuard } from '@modules/auth/guards/permissions.guard';
 import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
 
+// ─── WHY APP_GUARD IS THE RIGHT PATTERN ──────────────────────────────────────
+//
+// JwtAuthGuard and PermissionsGuard are registered as global APP_GUARDs here
+// rather than applied with @UseGuards() on individual controllers.
+//
+// WHY:
+//   If you put @UseGuards(PermissionsGuard) on a controller inside RbacModule,
+//   NestJS tries to instantiate PermissionsGuard inside that module's context.
+//   But PermissionsGuard depends on UserRolesService, AuditService, and
+//   ContextEvaluatorService — none of which are available inside RolesModule.
+//   You'd get a "Nest can't resolve dependencies" error.
+//
+//   By registering them here at AppModule level, NestJS instantiates the guards
+//   once in AppModule's context, where RbacModule IS imported and all those
+//   services ARE available.
+//
+// RESULT:
+//   Every route in the app is protected without any @UseGuards() decoration.
+//   Controllers just use @RequirePermissions() or @Public() — nothing else.
+//
+// ─── GUARD EXECUTION ORDER ───────────────────────────────────────────────────
+//
+// Guards run in the ORDER they appear in the providers[] array:
+//   1. JwtAuthGuard — validates the token, populates req.user
+//   2. PermissionsGuard — checks req.user's permissions (needs req.user, so must run second)
+//
+// If JwtAuthGuard fails (401), PermissionsGuard never runs.
+// If JwtAuthGuard passes but PermissionsGuard fails (403), the controller never runs.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Module({
   imports: [
-   
+    // Makes ConfigService available everywhere — reads .env files
     ConfigModule.forRoot({ isGlobal: true }),
 
-  
+    // MongoDB connection — URI comes from .env via ConfigService
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -31,79 +63,34 @@ import { JwtAuthGuard } from '@modules/auth/guards/jwt-auth.guard';
       }),
     }),
 
-    /*
-      CacheModule sets up Redis caching globally.
-      isGlobal: true means RbacCacheService can inject it
-      anywhere without re-importing CacheModule each time.
-      This is what makes permission checks fast — cached results
-      don't need a MongoDB round trip.
-    */
+    // Redis cache — isGlobal: true means RbacCacheService can inject
+    // CACHE_MANAGER anywhere without re-importing CacheModule each time.
     CacheModule.register({ isGlobal: true }),
 
-    /*
-      QueueModule sets up BullMQ with Redis connection.
-      Must be imported here so the audit queue is available
-      across the entire app — specifically for QueueService
-      which permissions.guard.ts uses to log every permission check.
-    */
+    // BullMQ queues (audit queue) — connects to Redis
     QueueModule,
 
-    /*
-      AuthModule sets up JWT validation and Passport.
-      Must be imported here because JwtAuthGuard is used
-      in controllers across multiple modules.
-      AuthModule exports JwtAuthGuard so all other modules
-      can use it without importing AuthModule themselves.
-    */
+    // JWT validation + Passport + AuthController (/auth/login, /auth/me, etc.)
     AuthModule,
 
-    /*
-      RbacModule brings in everything RBAC related:
-      roles, permissions, user-roles, audit, and context evaluation.
-      This is the core of your entire system.
-
-      IMPORTANT: RbacModule exports UserRolesModule, AuditModule,
-      and ContextEvaluatorService — all of which PermissionsGuard
-      needs. Because RbacModule is imported here at the root level,
-      those exports are available in AppModule's context, which means
-      the global APP_GUARD below can access them.
-    */
+    // Roles, permissions, user-roles, audit, context evaluator
     RbacModule,
 
-    /*
-      UsersModule registers the /users routes and UsersService.
-      It depends on AuthModule being loaded first for JwtAuthGuard —
-      NestJS handles that dependency order automatically.
-    */
+    // User management (CRUD for user accounts)
     UsersModule,
+
+    // NEW: Bonus approval endpoint — requires 'bonus:approve' permission
+    // The global guards protect it automatically.
+    BonusModule,
   ],
 
   providers: [
-    /*
-      APP_GUARD is a special NestJS token that registers a guard
-      GLOBALLY — meaning it runs on every single route in the entire app.
-
-      WHY THIS SOLVES THE PROBLEM:
-      When you use @UseGuards(PermissionsGuard) on a controller inside
-      RolesModule, NestJS tries to instantiate PermissionsGuard inside
-      RolesModule's context — but RolesModule doesn't know about
-      UserRolesService, AuditService, or ContextEvaluatorService.
-
-      By moving PermissionsGuard here with APP_GUARD, it's instantiated
-      at the AppModule level, where ALL of those services ARE available
-      (because RbacModule is imported here and exports them).
-
-      You can now REMOVE @UseGuards(PermissionsGuard) from individual
-      controllers — the guard runs automatically on every route.
-      Keep @UseGuards(JwtAuthGuard) since that's a different guard.
-      Keep @RequirePermissions(...) decorators — those still work.
-      Routes with no @RequirePermissions decorator are passed through
-      automatically (the guard checks for this and returns true).
-    */
+    // Guard 1: validates JWT, populates req.user
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
+    // Guard 2: checks permissions from req.user against @RequirePermissions() metadata
     {
       provide: APP_GUARD,
       useClass: PermissionsGuard,
